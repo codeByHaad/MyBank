@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+captures/
+mybank_log.csv
+reference.jpg
+diff_heatmap.jpg
+qr_*.png
+.DS_Store
+.vscode/
+.idea/
