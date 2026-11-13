@@ -107,6 +107,24 @@ Thresholds are at the top of `mybank_vision.py` and should be tuned for your lig
 5. Trigger the simulated temperature alert (LED + dashboard).
 6. State clearly that this is a demonstration, not a clinical diagnosis.
 
+# Blood Guard Unit
+
+A 3D model of the add-on from the design sheet. The camera, backlight and probes sit inside the existing fridge. The processor, battery, screen and alarm stay outside, joined by a flat cable that passes under the door gasket.
+
+View
+
+Show
+
+Path
+
+Screen
+
+Drag to rotate · scroll to zoom · right-drag to pan
+
+Intelligence path: image, then decision Safety path: temperature, then alarm Blood bag Optional part
+
+Schematic model built from the Blood Guard Unit design sheet. The bag-to-window distance (about 20 cm) and diffuser-to-cradle distance (about 3 cm) follow the sheet; every other proportion is approximate. It is a concept for the hackathon, not a certified medical device.
+
 ## Limitations
 
 - Temperature inside the enclosure is not the temperature of the bag contents.
