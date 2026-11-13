@@ -1,0 +1,647 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Blood Guard Unit 3D</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Archivo:wght@600;700&display=swap">
+<style>
+/* Layout: engineering sheet. A large 3D viewer on the left with a toolbar above it, a parts index and detail card on the right. Blue = intelligence path, amber = safety path, red = the blood bag. */
+:root{
+  --bg:#F2F5F7; --surface:#FFFFFF; --fg:#14212B; --muted:#586977; --line:#D5DEE4;
+  --accent:#1D4E6B; --accent-fg:#FFFFFF; --blood:#A31621;
+  --ok:#1B7F5C; --warn:#9A6212; --bad:#C0262D;
+  --stage-a:#F8FAFB; --stage-b:#E3EBF0; --grid:rgba(29,78,107,.09);
+  --font-body:"IBM Plex Sans","Segoe UI",Roboto,Arial,sans-serif;
+  --font-display:"Archivo","IBM Plex Sans","Segoe UI",Arial,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0E1720; --surface:#16222D; --fg:#E6EEF3; --muted:#93A5B3; --line:#2A3A47;
+  --accent:#6FB3D6; --accent-fg:#08202E; --blood:#E0525C;
+  --ok:#4CC49A; --warn:#E0B050; --bad:#F0646C;
+  --stage-a:#1B2B38; --stage-b:#0F1B25; --grid:rgba(111,179,214,.09); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E1720; --surface:#16222D; --fg:#E6EEF3; --muted:#93A5B3; --line:#2A3A47;
+  --accent:#6FB3D6; --accent-fg:#08202E; --blood:#E0525C;
+  --ok:#4CC49A; --warn:#E0B050; --bad:#F0646C;
+  --stage-a:#1B2B38; --stage-b:#0F1B25; --grid:rgba(111,179,214,.09); color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:15px;line-height:1.6}
+.app{max-width:1280px;margin:0 auto;padding-block:24px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:18px}
+h1,h2,h3{font-family:var(--font-display);text-wrap:balance;margin:0;line-height:1.25}
+h1{font-size:clamp(28px,5vw,40px);font-weight:700;letter-spacing:-.01em}
+h2{font-size:18px;font-weight:700}
+h3{font-size:12.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+p{margin:0}
+.lead{color:var(--muted);max-width:74ch;margin-top:6px}
+
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}
+.viewer{min-width:0;display:flex;flex-direction:column;gap:10px}
+.tb{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center}
+.grp{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.gl{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-inline-end:2px}
+.chip{font:500 13px var(--font-body);color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:5px 12px;cursor:pointer;line-height:1.3}
+.chip:hover{border-color:var(--accent)}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.chip.chip-s[aria-pressed="true"]{background:var(--warn);border-color:var(--warn);color:var(--bg)}
+.chip:focus-visible,.item:focus-visible,.tag:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.stage{position:relative;height:clamp(380px,66vh,700px);border:1px solid var(--line);border-radius:10px;overflow:hidden;touch-action:none;
+  background:
+   repeating-linear-gradient(0deg,transparent 0 31px,var(--grid) 31px 32px),
+   repeating-linear-gradient(90deg,transparent 0 31px,var(--grid) 31px 32px),
+   linear-gradient(var(--stage-a),var(--stage-b))}
+.stage canvas{display:block;width:100%;height:100%;cursor:grab}
+.stage canvas:active{cursor:grabbing}
+#tags{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.tag{position:absolute;left:0;top:0;width:22px;height:22px;border-radius:50%;border:0;padding:0;background:var(--accent);color:var(--accent-fg);font:700 11px var(--font-body);display:flex;align-items:center;justify-content:center;pointer-events:auto;cursor:pointer;box-shadow:0 0 0 2px var(--surface);will-change:transform}
+.tag.on{background:var(--blood);color:#fff;box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--blood)}
+.tag.dim{opacity:.25}
+#tip{position:absolute;pointer-events:none;background:var(--fg);color:var(--bg);font-size:12.5px;font-weight:500;padding:3px 9px;border-radius:6px;white-space:nowrap;transform:translate(12px,-30px);opacity:0;transition:opacity .12s}
+#tip.show{opacity:1}
+.fail{position:absolute;inset:0;margin:auto;max-width:36ch;height:max-content;text-align:center;color:var(--muted)}
+.hint{position:absolute;left:12px;bottom:10px;font-size:12px;color:var(--muted);pointer-events:none}
+
+.legend{display:flex;flex-wrap:wrap;gap:6px 20px;font-size:13px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.sw{width:22px;height:0;border-top:3px solid var(--accent)}
+.sw.s{border-top-color:var(--warn)}
+.sw.r{border-top:3px dashed var(--accent)}
+.sw.o{border-top:2px dashed var(--muted)}
+.dot{width:12px;height:12px;border-radius:3px;background:var(--blood);opacity:.85}
+
+.side{display:flex;flex-direction:column;gap:14px;min-width:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.card .hd{display:flex;gap:10px;align-items:center}
+.num{flex:none;width:26px;height:26px;border-radius:50%;background:var(--accent);color:var(--accent-fg);font:700 12px var(--font-body);display:inline-flex;align-items:center;justify-content:center}
+.pills{display:flex;flex-wrap:wrap;gap:6px}
+.pill{font-size:12px;font-weight:600;padding:2px 9px;border-radius:99px;background:color-mix(in srgb,var(--muted) 14%,transparent);color:var(--muted)}
+.pill.i{background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent)}
+.pill.s{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.cost{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+ul.tight{margin:0;padding-inline-start:20px;display:flex;flex-direction:column;gap:5px}
+
+.list{display:flex;flex-direction:column;gap:12px}
+.list .grpt{display:flex;flex-direction:column;gap:2px}
+.item{display:flex;gap:10px;align-items:center;width:100%;text-align:start;font:14px var(--font-body);color:var(--fg);background:transparent;border:1px solid transparent;border-radius:8px;padding:5px 8px;cursor:pointer}
+.item:hover{background:color-mix(in srgb,var(--accent) 8%,transparent)}
+.item.on{background:color-mix(in srgb,var(--blood) 10%,transparent);border-color:var(--blood)}
+.item .num{width:22px;height:22px;font-size:11px}
+.item .pd{margin-inline-start:auto;width:8px;height:8px;border-radius:50%;flex:none;background:transparent}
+.item .pd.i{background:var(--accent)}.item .pd.s{background:var(--warn)}.item .pd.b{background:linear-gradient(90deg,var(--accent) 50%,var(--warn) 50%)}
+.note{font-size:13px;color:var(--muted);max-width:90ch}
+
+@media (max-width:900px){
+  .layout{grid-template-columns:minmax(0,1fr)}
+  .stage{height:clamp(340px,58vh,520px)}
+}
+@media (prefers-reduced-motion:reduce){#tip{transition:none}}
+</style>
+
+<div class="app" dir="ltr" lang="en">
+  <header>
+    <h1>Blood Guard Unit</h1>
+    <p class="lead">A 3D model of the add-on from the design sheet. The camera, backlight and probes sit inside the existing fridge. The processor, battery, screen and alarm stay outside, joined by a flat cable that passes under the door gasket.</p>
+  </header>
+
+  <div class="layout">
+    <section class="viewer" aria-label="Interactive 3D model">
+      <div class="tb">
+        <div class="grp" role="group" aria-label="Camera view"><span class="gl">View</span>
+          <button class="chip" data-view="overview" aria-pressed="true">Overview</button>
+          <button class="chip" data-view="head" aria-pressed="false">Cold head</button>
+          <button class="chip" data-view="gasket" aria-pressed="false">Gasket</button>
+          <button class="chip" data-view="unit" aria-pressed="false">Outer unit</button>
+        </div>
+        <div class="grp" role="group" aria-label="Display options"><span class="gl">Show</span>
+          <button class="chip" data-tog="explode" aria-pressed="false">Exploded</button>
+          <button class="chip" data-tog="hood" aria-pressed="true">Open hood</button>
+          <button class="chip" data-tog="box" aria-pressed="true">Open outer box</button>
+          <button class="chip" data-tog="fridge" aria-pressed="true">Fridge</button>
+          <button class="chip" data-tog="rays" aria-pressed="true">Light path</button>
+          <button class="chip" data-tog="shake" aria-pressed="false">Shake bag</button>
+          <button class="chip" data-tog="labels" aria-pressed="true">Labels</button>
+        </div>
+        <div class="grp" role="group" aria-label="Highlight a signal path"><span class="gl">Path</span>
+          <button class="chip" data-path="all" aria-pressed="true">All</button>
+          <button class="chip" data-path="i" aria-pressed="false">Intelligence</button>
+          <button class="chip chip-s" data-path="s" aria-pressed="false">Safety</button>
+        </div>
+        <div class="grp"><span class="gl">Screen</span><button class="chip" id="screenBtn" type="button" title="Cycle the three screen states from the design sheet">Stable</button></div>
+      </div>
+
+      <div class="stage" id="stage">
+        <div id="tags"></div>
+        <div id="tip"></div>
+        <div class="hint">Drag to rotate · scroll to zoom · right-drag to pan</div>
+      </div>
+
+      <div class="legend">
+        <span><i class="sw"></i>Intelligence path: image, then decision</span>
+        <span><i class="sw s"></i>Safety path: temperature, then alarm</span>
+        <span><i class="dot"></i>Blood bag</span>
+        <span><i class="sw o"></i>Optional part</span>
+      </div>
+    </section>
+
+    <aside class="side">
+      <div class="card" id="info" aria-live="polite"></div>
+      <div class="list" id="list"></div>
+    </aside>
+  </div>
+
+  <p class="note">Schematic model built from the Blood Guard Unit design sheet. The bag-to-window distance (about 20 cm) and diffuser-to-cradle distance (about 3 cm) follow the sheet; every other proportion is approximate. It is a concept for the hackathon, not a certified medical device.</p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function(){
+'use strict';
+var stage=document.getElementById('stage');
+if(!window.THREE||!THREE.OrbitControls){stage.insertAdjacentHTML('beforeend','<p class="fail">The 3D library did not load. Check your connection and reload.</p>');return;}
+var T=THREE;
+var reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+function css(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();}
+function isDark(){var t=document.documentElement.getAttribute('data-theme');if(t)return t==='dark';return window.matchMedia('(prefers-color-scheme: dark)').matches;}
+
+var renderer;
+try{renderer=new T.WebGLRenderer({antialias:true,alpha:true});}
+catch(err){stage.insertAdjacentHTML('beforeend','<p class="fail">This browser could not start WebGL, so the 3D view is unavailable.</p>');return;}
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+renderer.domElement.setAttribute('aria-label','3D model of the Blood Guard Unit');
+stage.insertBefore(renderer.domElement,stage.firstChild);
+
+var scene=new T.Scene();
+var camera=new T.PerspectiveCamera(36,1,1,1400);
+var controls=new T.OrbitControls(camera,renderer.domElement);
+controls.enableDamping=true;controls.dampingFactor=.08;controls.minDistance=12;controls.maxDistance=460;controls.maxPolarAngle=Math.PI*.56;controls.screenSpacePanning=true;
+scene.add(new T.HemisphereLight(0xffffff,0x7d8c99,.95));
+var d1=new T.DirectionalLight(0xffffff,.85);d1.position.set(80,140,110);scene.add(d1);
+var d2=new T.DirectionalLight(0xbfd8ea,.35);d2.position.set(-120,60,-90);scene.add(d2);
+
+/* ---------- constants (cm) ---------- */
+var BX=-10.5;                       // bag centre along the optical axis, hood-local
+var HEAD=new T.Vector3(-8,2,-5);    // hood centre in world space
+var UNIT=new T.Vector3(62,-7,28);   // outer unit centre
+var SHELF_Y=-10;
+function V(x,y,z){return new T.Vector3(x||0,y||0,z||0);}
+function W(x,y,z){return V(x+HEAD.x,y+HEAD.y,z+HEAD.z);}
+function U(x,y,z){return V(x+UNIT.x,y+UNIT.y,z+UNIT.z);}
+
+/* ---------- helpers ---------- */
+var parts={},PART=null,lineKinds=[],ready=false;
+function mat(color,o){o=o||{};var tr=o.o!==undefined&&o.o<1;
+  return new T.MeshStandardMaterial({color:color,roughness:o.r!==undefined?o.r:.55,metalness:o.m!==undefined?o.m:.1,transparent:tr,opacity:o.o!==undefined?o.o:1,side:o.side||T.FrontSide,depthWrite:!tr,emissive:o.e||0x000000});}
+function part(id,name,o){var g=new T.Group();
+  var p={id:id,name:name,group:g,meshes:[],lines:[],base:(o.base||V()).clone(),off:o.off?V(o.off[0],o.off[1],o.off[2]):V(),anchor:o.anchor?V(o.anchor[0],o.anchor[1],o.anchor[2]):null,zone:o.zone,path:o.path||'n',text:o.text||'',cost:o.cost||'',noPick:!!o.noPick,tag:o.tag!==false&&!!o.anchor};
+  g.position.copy(p.base);scene.add(g);parts[id]=p;PART=p;return p;}
+function put(mesh,x,y,z,o){o=o||{};mesh.position.set(x||0,y||0,z||0);mesh.userData.part=PART.id;
+  if(o.veil)mesh.userData.veil=true;if(o.cut)mesh.userData.cut=o.cut;PART.group.add(mesh);PART.meshes.push(mesh);return mesh;}
+function lineMat(kind,dashed){var m=dashed?new T.LineDashedMaterial({color:0x888888,dashSize:.9,gapSize:.6}):new T.LineBasicMaterial({color:0x888888});
+  m.transparent=true;m.opacity=kind==='accent'?.95:.7;lineKinds.push({m:m,kind:kind});return m;}
+function outline(mesh,kind,dashed){var l=new T.LineSegments(new T.EdgesGeometry(mesh.geometry,25),lineMat(kind||'muted',dashed));
+  if(dashed)l.computeLineDistances();mesh.add(l);PART.lines.push(l);return l;}
+function box(w,h,d,c,x,y,z,o){o=o||{};var m=put(new T.Mesh(new T.BoxGeometry(w,h,d),mat(c,o)),x,y,z,o);if(o.ol)outline(m,o.ol,o.dash);return m;}
+function cyl(r,h,c,x,y,z,o){o=o||{};var g=new T.CylinderGeometry(r,o.r2!==undefined?o.r2:r,h,o.seg||24);
+  if(o.ax==='x')g.rotateZ(Math.PI/2);if(o.ax==='z')g.rotateX(Math.PI/2);return put(new T.Mesh(g,mat(c,o)),x,y,z,o);}
+function sph(r,c,x,y,z,o){o=o||{};var m=put(new T.Mesh(new T.SphereGeometry(r,16,12),mat(c,o)),x,y,z,o);if(o.sc)m.scale.set(o.sc[0],o.sc[1],o.sc[2]);return m;}
+function tube(pts,r,c,o){o=o||{};var g=new T.TubeGeometry(new T.CatmullRomCurve3(pts),o.seg||48,r,8,false);return put(new T.Mesh(g,mat(c,o)),0,0,0,o);}
+function canvasTex(w,h,draw){var c=document.createElement('canvas');c.width=w;c.height=h;draw(c.getContext('2d'),w,h);var t=new T.CanvasTexture(c);t.anisotropy=4;return t;}
+function facePlane(w,h,tex,x,y,z,o){o=o||{};var g=new T.PlaneGeometry(w,h);g.rotateY(Math.PI/2);
+  return put(new T.Mesh(g,new T.MeshBasicMaterial({map:tex,transparent:!!o.tr,side:T.DoubleSide})),x,y,z,o);}
+function slabGeo(w,h,t,r){var s=new T.Shape(),x=-w/2,y=-h/2;
+  s.moveTo(x+r,y);s.lineTo(x+w-r,y);s.quadraticCurveTo(x+w,y,x+w,y+r);s.lineTo(x+w,y+h-r);s.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  s.lineTo(x+r,y+h);s.quadraticCurveTo(x,y+h,x,y+h-r);s.lineTo(x,y+r);s.quadraticCurveTo(x,y,x+r,y);
+  var g=new T.ExtrudeGeometry(s,{depth:t,bevelEnabled:false,curveSegments:6});g.translate(0,0,-t/2);g.rotateY(Math.PI/2);return g;}
+function seeded(seed){return function(){seed=(seed*1664525+1013904223)%4294967296;return seed/4294967296;};}
+
+/* ---------- the flat cable curve (needed by the probe wires) ---------- */
+var cableCurve=new T.CatmullRomCurve3([
+  W(21.4,-9.5,0),V(21,-7.5,6),V(29,-7.5,22),V(35.5,-7.5,30.5),V(40,-7.5,33),V(46,-7.5,32.5),V(50.4,-7.5,30.5)],false,'centripetal');
+
+/* ======================================================= */
+/*  EXISTING FRIDGE, SHELF, TABLE                            */
+/* ======================================================= */
+part('K','Existing fridge',{zone:'ex',path:'n',
+  text:'The blood bank keeps the refrigerator it already has (1 to 6 °C). The add-on sits inside it and nothing is replaced. Use the Fridge button to hide the walls and door.'});
+(function(){
+  function wall(w,h,d,x,y,z){var m=box(w,h,d,0x9db4c4,x,y,z,{o:.11,side:T.DoubleSide,veil:true});outline(m,'muted');return m;}
+  wall(86,90,3,0,0,-33.5);            // back
+  wall(3,90,67,-41.5,0,-1.5);         // left
+  wall(3,90,67,41.5,0,-1.5);          // right
+  wall(80,3,64,0,-43.5,0);            // floor
+  wall(80,3,64,0,43.5,0);             // ceiling
+  var door=box(86,90,2,0x9db4c4,0,0,35,{o:.1,side:T.DoubleSide,veil:true});outline(door,'muted');
+  cyl(.9,30,0x39444d,37,0,38.6,{});
+  box(1.2,1.2,3,0x39444d,37,13,36.9,{}); box(1.2,1.2,3,0x39444d,37,-13,36.9,{});
+})();
+
+part('S','Shelf and stored bags',{zone:'cold',path:'n',noPick:true});
+(function(){
+  var c=0xaab4bb,i,x,z;
+  for(z=-30;z<=30;z+=5)box(76,.5,.5,c,0,SHELF_Y-.25,z,{m:.5,r:.4});
+  for(x=-36;x<=36;x+=8)box(.5,.5,62,c,x,SHELF_Y-.75,0,{m:.5,r:.4});
+  [11,25].forEach(function(bx){var m=put(new T.Mesh(slabGeo(11,14,1.8,1.2),mat(0x7a1220,{o:.92,r:.4})),bx,SHELF_Y+.9,22);m.rotation.z=Math.PI/2;});
+})();
+
+part('T','Side table',{zone:'ex',path:'n',noPick:true});
+(function(){
+  var c=0x8a949c;
+  box(28,.8,16,c,62,-14.9,28,{r:.7});
+  [[-12,-6],[12,-6],[-12,6],[12,6]].forEach(function(p){box(1.4,29.7,1.4,c,62+p[0],-30.15,28+p[1],{r:.7});});
+})();
+
+/* ======================================================= */
+/*  COLD HEAD (hood-local coordinates, base = HEAD)          */
+/* ======================================================= */
+/* 1 LED backlight */
+part('1','LED backlight panel',{zone:'cold',path:'i',base:HEAD,off:[-9,0,0],anchor:[-16.5,8.6,0],
+  text:'White light panel with near-infrared LEDs (850 nm), switched on in alternation. It shines through the bag from behind, so a clot shows up as a dark spot.',
+  cost:'60 to 120 SAR with the diffuser and driver'});
+box(1.2,16,14,0x2b3540,-16.5,0,0,{r:.7});
+facePlane(14,16,canvasTex(256,256,function(c,w,h){c.fillStyle='#1a2026';c.fillRect(0,0,w,h);
+  for(var r=0;r<8;r++)for(var k=0;k<8;k++){var white=k%2===0;c.fillStyle=white?'#fff4d6':'#c4352a';c.beginPath();c.arc(16+k*32,16+r*32,white?10:8,0,6.3);c.fill();}}),-15.86,0,0);
+
+/* 2 diffuser */
+part('2','Diffuser',{zone:'cold',path:'i',base:HEAD,off:[-4.5,0,0],anchor:[-13.5,-3,7],
+  text:'Spreads the light evenly across the whole bag. It sits about 3 cm in front of the cradle.'});
+box(.5,16,14,0xe3ebf0,-13.5,0,0,{o:.5,r:.3,ol:'muted'});
+
+/* 3 cradle */
+part('3','Bag cradle',{zone:'cold',path:'i',base:HEAD,off:[0,-1,0],anchor:[BX,-8.3,5.2],
+  text:'Holds the bag flat at a fixed thickness without squeezing it, so the light path is the same every time.'});
+(function(){var c=0x6c7b88;
+  [-1.1,1.1].forEach(function(dx){var x=BX+dx;
+    box(.4,1.2,12,c,x,6.9,0,{r:.6});box(.4,1.2,12,c,x,-6.9,0,{r:.6});
+    box(.4,12.6,1.2,c,x,0,5.4,{r:.6});box(.4,12.6,1.2,c,x,0,-5.4,{r:.6});});
+  box(5,.8,12.4,c,BX,-8,0,{r:.6});
+  box(2.4,.8,.8,c,BX,-7.4,6.1,{r:.6});box(2.4,.8,.8,c,BX,-7.4,-6.1,{r:.6});
+})();
+
+/* 4 colour strip */
+part('4','Reference color strip',{zone:'cold',path:'i',base:HEAD,off:[2,4,10],anchor:[BX+1.45,6.5,5.4],
+  text:'Three patches (grey, white, red) visible in every image. The software uses them to correct color before it analyses the bag.'});
+[[0x8a8f94,5.9],[0xf3f3f3,4.7],[0xb3202a,3.5]].forEach(function(p){box(.12,1,1,p[0],BX+1.36,p[1],5.4,{ol:'muted'});});
+
+/* A blood bag */
+part('A','Blood bag',{zone:'cold',path:'i',base:HEAD,off:[0,0,13],anchor:[BX+.9,-5.6,-3.6],
+  text:'Demo bag with red liquid. The barcode label (ISBT 128) is read by the same camera and ties the inspection and the temperature record to the unit. The dark spots are clots; light is blocked there, so they show against the backlight.',
+  cost:'For the hackathon: a bag of red liquid with gelatin clots'});
+(function(){
+  var bag=put(new T.Mesh(slabGeo(11,14,1.6,1.2),mat(0xA31621,{o:.82,r:.3})),BX,0,0);outline(bag,'accent');
+  sph(.8,0x1e0508,BX,2.6,-1.8,{sc:[.55,1.1,1.1]});sph(.55,0x1e0508,BX,-3.4,2.2,{sc:[.55,1.1,1.1]});sph(.42,0x1e0508,BX,.4,3.3,{sc:[.55,1,1]});
+  var rnd=seeded(7);
+  facePlane(6,4,canvasTex(256,170,function(c,w,h){c.fillStyle='#fff';c.fillRect(0,0,w,h);c.fillStyle='#111';var x=18;
+    while(x<w-18){var bw=2+Math.floor(rnd()*6);c.fillRect(x,16,bw,92);x+=bw+2+Math.floor(rnd()*5);}
+    c.font='600 22px ui-monospace,Menlo,Consolas,monospace';c.textAlign='center';c.fillText('BAG 123406',w/2,146);}),BX+.83,4.4,-.5);
+  tube([V(BX,6.9,1),V(BX,9,1),V(BX+.5,9.8,5),V(BX+.5,8.6,8.6)],.32,0xb02a35,{o:.9,r:.35});
+})();
+
+/* D spectral sensor (optional) */
+part('D','Spectral sensor (optional)',{zone:'cold',path:'i',base:HEAD,off:[0,5,13],anchor:[BX+.5,11.5,5],
+  text:'AS7341 clipped on the bag tubing for finer color readings. It is only a screening signal for hemolysis, not a diagnosis. Its signal returns on the same cable.',
+  cost:'60 to 110 SAR (optional)'});
+box(1.8,1.4,2.6,0x28323b,BX+.5,9.8,5,{});
+box(1.5,.15,2,0x1c6a47,BX+.5,10.58,5,{});
+box(.6,.1,.6,0xf3f3f3,BX+.5,10.68,5,{});
+(function(){var m=box(2.8,2.4,3.6,0x000000,BX+.5,9.8,5,{o:.001});outline(m,'accent',true);})();
+
+/* 5 window with heater film */
+part('5','Window with heater film',{zone:'cold',path:'i',base:HEAD,off:[5,0,0],anchor:[8,8.7,6],
+  text:'A glass window set into a partition between the bag side and the camera side. A thin heater film around it stops the lens fogging when warm room air reaches the cold glass.',
+  cost:'Part of 80 to 190 SAR (enclosures, window, heater, desiccant)'});
+(function(){var c=0x3a4651;
+  box(.8,3.5,20,c,8,10.25,0,{});box(.8,3.5,20,c,8,-10.25,0,{});
+  box(.8,17,3,c,8,0,8.5,{});box(.8,17,3,c,8,0,-8.5,{});
+  box(.4,17,14,0x9fd0ea,8,0,0,{o:.22,r:.1,ol:'accent'});
+  facePlane(14,17,canvasTex(256,310,function(c2,w,h){c2.clearRect(0,0,w,h);c2.strokeStyle='#E0A030';c2.lineWidth=5;c2.lineJoin='round';
+    c2.beginPath();var y=18,dir=1;c2.moveTo(10,y);
+    while(y<h-10){c2.lineTo(dir>0?w-10:10,y);y+=26;c2.lineTo(dir>0?w-10:10,y);dir=-dir;}c2.stroke();}),8.24,0,0,{tr:true});
+})();
+
+/* 6 camera */
+part('6','Camera without IR-cut filter',{zone:'cold',path:'i',base:HEAD,off:[11,0,0],anchor:[15.65,3.5,0],
+  text:'A camera with the infrared-cut filter removed, fixed exposure and fixed focus. It sees the visible image and the 850 nm image, and reads the ISBT 128 barcode.',
+  cost:'120 to 250 SAR'});
+box(6.5,6.5,7,0x23282e,15.65,0,0,{r:.5,ol:'muted'});
+cyl(2.2,3,0x151a1f,10.9,0,0,{ax:'x',m:.5,r:.4});
+cyl(2.5,.5,0x9aa5ad,11.7,0,0,{ax:'x',m:.8,r:.3});
+cyl(1.6,.2,0x0b1a28,9.3,0,0,{ax:'x',m:.9,r:.1});
+sph(.25,0x3dd68c,13,3.15,2.6,{e:0x3dd68c});
+tube([V(18.9,-1.5,0),V(20.3,-3.5,.3),V(21.3,-7,.2),V(21.3,-9.5,0)],.4,0x23282e,{r:.6});
+
+/* 7 desiccant */
+part('7','Desiccant pack',{zone:'cold',path:'i',base:HEAD,off:[0,10,-6],anchor:[15,11.8,-4],
+  text:'A silica pack inside the sealed hood that keeps the air dry around the lens and the backlight.'});
+(function(){var m=box(4.5,1.1,5.5,0xe9e2c9,15,11.1,-4,{r:.9});outline(m,'accent',true);})();
+
+/* 8 hood */
+part('8','Opaque hood',{zone:'cold',path:'i',base:HEAD,off:[0,24,0],anchor:[-19,12,10],
+  text:'An opaque hood that blocks the fridge light and keeps imaging conditions fixed. Bag to window is about 20 cm, to be tuned by testing. Use Open hood to cut away the front and top.',
+  cost:'Part of 80 to 190 SAR (printed enclosures)'});
+(function(){var c=0x1d2833,o={o:.26,r:.8,veil:true,side:T.DoubleSide};
+  box(40,.3,20,c,1,-12,0,o);
+  box(40,.3,20,c,1,12,0,{o:.26,r:.8,veil:true,side:T.DoubleSide,cut:'top'});
+  box(40,24,.3,c,1,0,10,{o:.26,r:.8,veil:true,side:T.DoubleSide,cut:'front'});
+  box(40,24,.3,c,1,0,-10,o);
+  box(.3,24,20,c,-19,0,0,o);box(.3,24,20,c,21,0,0,o);
+  cyl(1,.8,0x14181c,21,-9.5,0,{ax:'x'});
+  var frame=new T.Mesh(new T.BoxGeometry(40,24,20),new T.MeshBasicMaterial({visible:false}));frame.position.set(1,0,0);PART.group.add(frame);
+  var l=new T.LineSegments(new T.EdgesGeometry(frame.geometry),lineMat('muted',true));l.computeLineDistances();l.position.copy(frame.position);PART.group.add(l);PART.lines.push(l);
+})();
+
+/* 9 vibration motor */
+part('9','Vibration motor',{zone:'cold',path:'i',base:HEAD,off:[0,-5,0],anchor:[BX,-10.3,1.8],
+  text:'Shakes the bag briefly. Clots move differently from liquid, so they can be picked out from a short video. Press Shake bag to see it move.'});
+cyl(1.5,3.5,0x9aa5ad,BX,-10.15,0,{m:.7,r:.35});
+cyl(.9,.8,0xe07a1f,BX,-8.7,.8,{});
+
+/* ======================================================= */
+/*  PROBES, DOOR SENSOR                                      */
+/* ======================================================= */
+(function(){
+  var BP=V(-4,SHELF_Y,22);
+  part('10','Glycol bottle with probe',{zone:'cold',path:'s',base:BP,off:[0,0,12],anchor:[0,12.2,0],
+    text:'A bottle of glycol with a precision probe, placed on the shelf among the bags and outside the hood. It copies the thermal mass of a bag, so it follows the blood temperature instead of the air spikes when the door opens.',
+    cost:'100 to 190 SAR (PT1000 with MAX31865 and an air probe). A DS18B20 is enough for the first version'});
+  cyl(3.2,9,0xbfd9e6,0,4.5,0,{o:.38,r:.15});
+  cyl(2.9,6.2,0x3d88b5,0,3.4,0,{o:.8,r:.2});
+  cyl(1.4,2.2,0xbfd9e6,0,10.1,0,{o:.45,r:.15});
+  cyl(1.7,1.3,0x2a3238,0,11.85,0,{});
+  cyl(.22,10,0xcdd5da,0,6.5,0,{m:.8,r:.3});
+  var end=cableCurve.getPoint(.62);
+  tube([V(0,12.4,0),V(0,16,0),V(12,16,4),V(26,7,7),V(end.x-BP.x,end.y-BP.y,end.z-BP.z)],.25,0xdfe6ea,{r:.5,seg:60});
+
+  part('B','Air probe and door sensor',{zone:'cold',path:'s',anchor:[39.4,33,30.5],
+    text:'A small air probe and a magnetic door sensor. Together they explain why the temperature spiked when the door opened. The door sensor cannot tell how much a spike affected the bag.',
+    cost:'10 to 20 SAR for the door sensor'});
+  cyl(.55,3.2,0x2a3238,30,10,-30.4,{ax:'z',m:.3});
+  box(2.2,2.2,.4,0x2a3238,30,10,-31.8,{});
+  var e2=cableCurve.getPoint(.3);
+  tube([V(30,10,-29),V(31,2,-22),V(28,-6,-8),e2],.22,0xdfe6ea,{r:.5,seg:50});
+  box(1.2,5,1.2,0x2a3238,39.4,30,30.5,{});
+  box(2,5,1,0x9aa4ab,38.8,30,33.5,{m:.6});
+  box(2,1.5,1.05,0xb3202a,38.8,32.4,33.5,{});
+})();
+
+/* ======================================================= */
+/*  GASKET AND CABLE                                         */
+/* ======================================================= */
+part('J','Door gasket',{zone:'link',path:'n',anchor:[41.5,38,34.3],
+  text:'The fridge door seal stays as it is. A thin flat cable passes underneath it. The small gap in the vertical bar shows where the cable crosses.'});
+(function(){var c=0x1f262c,o={r:.9,ol:'muted'};
+  box(86,3,2,c,0,43.5,33,o);box(86,3,2,c,0,-43.5,33,o);box(3,84,2,c,-41.5,0,33,o);
+  box(3,33,2,c,41.5,-25.5,33,o);box(3,48,2,c,41.5,18,33,o);
+})();
+
+part('C','Flat cable under the gasket',{zone:'link',path:'b',anchor:[25,-6.6,14],
+  text:'A thin flat cable carries the image, light and temperature signals from the cold head to the outside unit. It passes under the door gasket. Ask the blood bank whether its quality system allows this.',
+  cost:'40 to 90 SAR with connectors'});
+(function(){
+  var N=140,pos=[],idx=[],i,up=V(0,1,0),wd=.65,th=.16;
+  for(i=0;i<=N;i++){var t=i/N,p=cableCurve.getPoint(t),tg=cableCurve.getTangent(t),sd=new T.Vector3().crossVectors(up,tg).normalize();
+    [[1,1],[-1,1],[-1,-1],[1,-1]].forEach(function(s){pos.push(p.x+sd.x*wd*s[0],p.y+th*s[1],p.z+sd.z*wd*s[0]);});}
+  for(i=0;i<N;i++){var a=i*4,b=a+4;for(var k=0;k<4;k++){var k2=(k+1)%4;idx.push(a+k,b+k,b+k2,a+k,b+k2,a+k2);}}
+  var g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(pos,3));g.setIndex(idx);g.computeVertexNormals();
+  put(new T.Mesh(g,mat(0x4f86a8,{r:.45,side:T.DoubleSide})),0,0,0);
+  /* harness inside the hood (world coordinates) */
+  tube([W(-16.5,-8,6),W(-16.5,-11.4,6.5),W(5,-11.6,5),W(19,-11.2,2),W(21.1,-9.5,.3)],.22,0x14181c,{r:.7});
+  tube([W(BX,-11.8,0),W(2,-11.7,-2),W(19,-11.3,-1),W(21.1,-9.5,-.3)],.22,0x14181c,{r:.7});
+  tube([W(8,-8,-7.3),W(8,-11.5,-7.3),W(19,-11.4,-3),W(21.1,-9.5,-.5)],.18,0xE0A030,{r:.7});
+  /* gland and terminal on the outer box */
+  cyl(.9,1.4,0x20272d,UNIT.x-10.9,UNIT.y-.5,UNIT.z+2.5,{ax:'x',r:.8});
+  var tb=U(-9.3,-.5,2.5);box(1.6,1.6,3.2,0x2f8f5f,tb.x,tb.y,tb.z,{});
+  tube([tb,U(-6,-1.2,1),U(1,-3.5,.6),U(2.4,-4.2,-.6)],.14,0x6fb3d6,{r:.6,seg:30});
+  tube([tb,U(-4,-3,4.5),U(.2,-5,4.2),U(.8,-5.15,3.7)],.14,0xE0A030,{r:.6,seg:30});
+})();
+
+/* ======================================================= */
+/*  OUTER UNIT (local coordinates, base = UNIT)              */
+/* ======================================================= */
+part('I','Outer box',{zone:'out',path:'n',base:UNIT,anchor:[10.9,6.6,-5],
+  text:'A printed enclosure at room temperature. It keeps the processor, battery and screen out of the cold and away from condensation. Use Open outer box to see inside.',
+  cost:'Part of 80 to 190 SAR (printed enclosures)'});
+(function(){var c=0x5b6872,o={r:.7};
+  box(22,.5,12,c,0,-6.75,0,o);
+  box(22,.5,12,c,0,6.75,0,{r:.7,cut:'top',ol:'muted'});
+  box(.5,14,12,c,-10.75,0,0,o);
+  box(.5,14,12,c,10.75,0,0,{r:.7,cut:'side',ol:'muted'});
+  box(22,14,.5,c,0,0,-5.75,o);
+})();
+
+part('E','Raspberry Pi 5',{zone:'out',path:'i',base:UNIT,off:[0,13,0],anchor:[-3.5,-3.2,-2.2],
+  text:'Intelligence path. It checks image quality, runs the model, then makes the decision. It reads the barcode, predicts expiry, stores records locally and uploads them when the network is back.',
+  cost:'250 to 350 SAR with cooler and power supply'});
+(function(){var y=-4.46,x=3.75,z=-2.2;
+  box(8.5,.17,5.6,0x14703d,x,y,z,{r:.6});
+  [[-3.9,-2.5],[3.9,-2.5],[-3.9,2.5],[3.9,2.5]].forEach(function(p){cyl(.28,2.2,0xc9a24a,x+p[0],-5.55,z+p[1],{m:.7,r:.4,seg:10});});
+  box(2.1,1.3,1.6,0xb9c1c7,x+3.2,y+.75,z-1.9,{m:.6,r:.4});box(1.7,1.5,1.3,0xb9c1c7,x+3.4,y+.85,z-.1,{m:.6,r:.4});box(1.7,1.5,1.3,0xb9c1c7,x+3.4,y+.85,z+1.4,{m:.6,r:.4});
+  box(5.1,.5,.5,0x14181c,x-.6,y+.34,z+2.3,{});
+  box(3.4,.3,3.4,0xaab3ba,x-1.6,y+.4,z-.3,{m:.7,r:.35});
+  for(var f=0;f<5;f++)box(3.4,.6,.14,0xaab3ba,x-1.6,y+.85,z-1.6+f*.7,{m:.7,r:.35});
+})();
+
+part('F','ESP32-S3',{zone:'out',path:'s',base:UNIT,off:[0,20,0],anchor:[3.2,-4.7,3.2],
+  text:'Safety path. It polls the temperature probes and the door sensor, and runs the alarm even when the AI or the Pi fails. A watchdog resets it if it hangs.',
+  cost:'40 to 70 SAR'});
+(function(){var x=3.2,y=-5.27,z=3.2;
+  box(5.2,.15,2.8,0x20252b,x,y,z,{r:.6});
+  [[-1.8,-1],[1.8,-1],[-1.8,1],[1.8,1]].forEach(function(p){cyl(.22,1.4,0xc9a24a,x+p[0],-6.1,z+p[1],{m:.7,r:.4,seg:10});});
+  box(1.8,.25,1.5,0xc3cad0,x-.9,y+.2,z,{m:.7,r:.35});
+  box(1.2,.04,2.2,0xc9a24a,x+1.7,y+.1,z,{m:.7,r:.4});
+  box(.9,.3,.7,0xc3cad0,x-2.4,y+.2,z+.2,{m:.7,r:.35});
+  box(4.6,.4,.25,0x14181c,x,y+.25,z-1.15,{});box(4.6,.4,.25,0x14181c,x,y+.25,z+1.15,{});
+})();
+
+part('G','Power and backup battery',{zone:'out',path:'s',base:UNIT,off:[0,0,-16],anchor:[-5.5,-2.1,-2.2],
+  text:'A 12 V supply from the fridge outlet and a LiFePO4 backup battery kept outside the cold, where it does not weaken. It keeps the alarm alive in a power cut.',
+  cost:'150 to 300 SAR (supply, battery and charger)'});
+(function(){
+  box(9,4.5,5.5,0x2d6a4f,-5.5,-4.5,-2.2,{r:.5});
+  box(9.05,1.2,5.55,0xe8eef1,-5.5,-4.5,-2.2,{r:.6});
+  box(1,.6,.6,0xb3202a,-8.5,-2.05,-2.2,{});box(1,.6,.6,0x14181c,-2.5,-2.05,-2.2,{});
+  box(7,2,3.5,0x2f3b44,-6.5,-5.75,3.2,{r:.5});
+  box(5.5,.15,3,0x14703d,-6.5,-4.65,3.2,{});
+})();
+
+part('H','Screen, buzzer and buttons',{zone:'out',path:'b',base:UNIT,off:[0,0,18],anchor:[-3.5,5,6.3],
+  text:'An OLED screen, a buzzer, three status lights and two buttons. The screen shows English and numbers only; full Arabic detail is in the hospital dashboard. Use the Screen button to cycle the three states from the sheet.',
+  cost:'40 to 70 SAR'});
+var oled=null,oledCtx=null,oledTex=null,leds=[];
+(function(){
+  box(22,14,.5,0x2d3740,0,0,5.75,{r:.6});
+  box(9,4.7,.4,0x14181c,-3.5,2.4,6.1,{});
+  oledTex=canvasTex(256,128,function(){});oledCtx=oledTex.image.getContext('2d');
+  oled=put(new T.Mesh(new T.PlaneGeometry(8,4),new T.MeshBasicMaterial({map:oledTex})),-3.5,2.4,6.32);
+  [4,6,8].forEach(function(x,i){leds.push(sph(.42,[0x37d67a,0xf5b83d,0xff4d4d][i],x,3.6,6.1,{e:0x000000,sc:[1,1,.6]}));});
+  cyl(1.8,.5,0x14181c,6,-2.2,6.1,{ax:'z'});
+  var bz=new T.Mesh(new T.PlaneGeometry(2.6,2.6),new T.MeshBasicMaterial({map:canvasTex(128,128,function(c,w,h){c.fillStyle='#14181c';c.fillRect(0,0,w,h);c.fillStyle='#3a4651';
+    for(var r=0;r<5;r++)for(var k=0;k<5;k++){c.beginPath();c.arc(14+k*25,14+r*25,5,0,6.3);c.fill();}})}));
+  put(bz,6,-2.2,6.37);
+  cyl(.8,.5,0xc3cad0,-5,-3.4,6.2,{ax:'z',m:.6,r:.3});cyl(.8,.5,0xc3cad0,-1.5,-3.4,6.2,{ax:'z',m:.6,r:.3});
+})();
+var SCREEN=[
+  {t:'4.2 C',l:['BAG 123406','STATUS: OK','BAT: 85%'],c:'#7CE3A6',pill:'Stable',led:0},
+  {t:'7.8 C',l:['BAG 123406','WARN: DOOR OPEN','ETA 10C: 9 MIN'],c:'#F5C65B',pill:'Early warning',led:1},
+  {t:'11.3 C',l:['BAG 123406','QUARANTINE','CLOT FLAG: REVIEW'],c:'#FF7A80',pill:'Quarantine and review',led:2}];
+var screenIdx=0;
+function drawScreen(){var s=SCREEN[screenIdx],c=oledCtx;c.fillStyle='#05080A';c.fillRect(0,0,256,128);c.fillStyle=s.c;c.textBaseline='top';
+  c.font='700 40px ui-monospace,Menlo,Consolas,monospace';c.fillText(s.t,10,6);
+  c.font='600 17px ui-monospace,Menlo,Consolas,monospace';s.l.forEach(function(t,i){c.fillText(t,10,52+i*23);});oledTex.needsUpdate=true;
+  leds.forEach(function(m,i){var on=i===s.led;m.material.emissive.setHex(on?[0x37d67a,0xf5b83d,0xff4d4d][i]:0x000000);m.material.color.setHex(on?[0x37d67a,0xf5b83d,0xff4d4d][i]:0x2a3238);
+    m.material.userData.b=null;});
+  document.getElementById('screenBtn').textContent=s.pill;snapPart(parts.H);if(ready)applyVisual();}
+
+/* ---------- snapshot base material state (for dimming / highlighting) ---------- */
+function snap(m){m.userData.b={o:m.opacity,t:m.transparent,dw:m.depthWrite,e:m.emissive?m.emissive.getHex():null,ei:m.emissiveIntensity};}
+function snapPart(p){p.meshes.forEach(function(m){snap(m.material);});p.lines.forEach(function(l){snap(l.material);});}
+
+/* ---------- light path ---------- */
+var rays=new T.Group();rays.position.copy(HEAD);scene.add(rays);
+var rayMats=[],pulses=[];
+(function(){var L=21.8,x0=-13.2;
+  [[4,-3],[0,0],[-4,3],[3,3.2],[-3,-3.2]].forEach(function(p,i){
+    var g=new T.CylinderGeometry(.07,.07,L,6);g.rotateZ(Math.PI/2);var m=new T.MeshBasicMaterial({color:0x8fd3ff,transparent:true,opacity:.65});rayMats.push(m);
+    var r=new T.Mesh(g,m);r.position.set(x0+L/2,p[0],p[1]);rays.add(r);
+    var s=new T.Mesh(new T.SphereGeometry(.3,10,8),m);s.userData={y:p[0],z:p[1],ph:i*.2,x0:x0,L:L};rays.add(s);pulses.push(s);});
+})();
+
+/* ---------- ground ---------- */
+var grid=new T.GridHelper(360,36,0x888888,0x888888);grid.position.y=-45.2;grid.material.transparent=true;grid.material.opacity=.28;scene.add(grid);
+
+/* ---------- finalize ---------- */
+Object.keys(parts).forEach(function(k){snapPart(parts[k]);});
+drawScreen();
+
+/* ---------- theme ---------- */
+function applyTheme(){var dark=isDark(),muted=css('--muted')||'#586977',acc=css('--accent')||'#1D4E6B';
+  lineKinds.forEach(function(k){k.m.color.set(k.kind==='accent'?acc:muted);});
+  parts.K.meshes.forEach(function(m){if(m.material.color)m.material.color.setHex(dark?0x9db4c4:0x6f8798);});
+  var gc=new T.Color(dark?0x6fb3d6:0x1d4e6b);grid.material.color.copy(gc);
+  rayMats.forEach(function(m){m.color.setHex(dark?0x8fd3ff:0x1b78b8);});}
+applyTheme();
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',applyTheme);
+new MutationObserver(applyTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+
+/* ======================================================= */
+/*  UI STATE                                                 */
+/* ======================================================= */
+var st={explode:false,hood:true,box:true,fridge:true,rays:true,shake:false,labels:true};
+var pathMode='all',selected=null,hovered=null,e=0,eTarget=0;
+
+var DESC={};
+var ZONE={cold:'Inside the fridge (1 to 6 °C)',out:'Outside the fridge',link:'Under the door gasket',ex:'Existing equipment'};
+var PATHN={i:'Intelligence path',s:'Safety path',b:'Both paths'};
+
+function inSet(p){return pathMode==='all'||p.path==='b'||p.path===pathMode;}
+function applyVisual(){
+  Object.keys(parts).forEach(function(k){var p=parts[k],member=inSet(p),dim=pathMode!=='all'&&!member;
+    var tint=(pathMode==='i'&&member&&p.path!=='n')?0x4aa3d8:(pathMode==='s'&&member&&p.path!=='n')?0xE0A030:null;
+    var hl=p.id===selected?1:(p.id===hovered&&!p.noPick)?.55:0;
+    p.meshes.forEach(function(m){var mm=m.material,b=mm.userData.b;if(!b)return;
+      if(dim){mm.transparent=true;mm.opacity=b.o*.12;mm.depthWrite=false;}else{mm.transparent=b.t;mm.opacity=b.o;mm.depthWrite=b.dw;}
+      if(mm.emissive){if(hl>0){mm.emissive.setHex(0x4aa3d8);mm.emissiveIntensity=.3+hl*.5;}
+        else if(tint!==null){mm.emissive.setHex(tint);mm.emissiveIntensity=.28;}
+        else{mm.emissive.setHex(b.e);mm.emissiveIntensity=b.ei;}}});
+    p.lines.forEach(function(l){var mm=l.material,b=mm.userData.b;if(!b)return;mm.opacity=dim?b.o*.1:b.o;});
+  });
+  tagList.forEach(function(t){t.el.classList.toggle('on',t.p.id===selected);t.el.classList.toggle('dim',pathMode!=='all'&&!inSet(t.p));});
+  document.querySelectorAll('.item').forEach(function(el){el.classList.toggle('on',el.dataset.id===selected);});
+}
+
+/* ---------- labels ---------- */
+var tagBox=document.getElementById('tags'),tagList=[];
+Object.keys(parts).forEach(function(k){var p=parts[k];if(!p.tag)return;
+  var b=document.createElement('button');b.className='tag';b.type='button';b.textContent=p.id;b.setAttribute('aria-label',p.name);
+  b.addEventListener('click',function(ev){ev.stopPropagation();select(p.id,true);});tagBox.appendChild(b);tagList.push({p:p,el:b});});
+var _v=new T.Vector3(),_o=new T.Raycaster(),_d=new T.Vector3(),solids=[],occN=0;
+function rebuildSolids(){solids=[];Object.keys(parts).forEach(function(k){var p=parts[k];if(k==='K'||k==='S'||k==='T'||k==='8')return;
+  p.meshes.forEach(function(m){var b=m.material.userData.b;if(m.visible&&p.group.visible&&b&&b.o>=.9&&m.geometry.type!=='PlaneGeometry')solids.push(m);});});}
+function updateOcc(){rebuildSolids();var cp=camera.position;
+  tagList.forEach(function(t){_v.copy(t.p.anchor);t.p.group.localToWorld(_v);_d.copy(_v).sub(cp);var dist=_d.length();_d.normalize();_o.set(cp,_d);_o.far=dist;
+    var hit=_o.intersectObjects(solids,false);t.occ=hit.length>0&&hit[0].distance<dist-1.4;});}
+function updateTags(){if(!st.labels)return;
+  if((occN++%10)===0)updateOcc();var w=renderer.domElement.clientWidth,h=renderer.domElement.clientHeight;
+  tagList.forEach(function(t){_v.copy(t.p.anchor);t.p.group.localToWorld(_v);_v.project(camera);
+    var ok=_v.z<1&&_v.z>-1;t.el.style.display=ok?'':'none';
+    t.el.style.opacity=t.occ?.0:'';t.el.style.pointerEvents=t.occ?'none':'';
+    if(ok)t.el.style.transform='translate('+((_v.x*.5+.5)*w).toFixed(1)+'px,'+((-_v.y*.5+.5)*h).toFixed(1)+'px) translate(-50%,-50%)';});}
+
+/* ---------- info card and list ---------- */
+var info=document.getElementById('info');
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function showIntro(){info.innerHTML='<h2>How the unit is split</h2>'+
+  '<ul class="tight"><li>Inside the fridge: camera, backlight, probes and the bag cradle only.</li><li>Outside the fridge: processor, battery, screen and alarm.</li><li>The safety path (temperature, then alarm) never passes through the AI.</li></ul>'+
+  '<p class="cost">Click a part in the model or in the list to read what it does and what it costs.</p>';}
+function showPart(p){var pills='<span class="pill">'+esc(ZONE[p.zone]||'')+'</span>'+(PATHN[p.path]?'<span class="pill '+(p.path==='b'?'':p.path)+'">'+PATHN[p.path]+'</span>':'');
+  info.innerHTML='<div class="hd"><span class="num">'+(p.tag?esc(p.id):'•')+'</span><h2>'+esc(p.name)+'</h2></div><div class="pills">'+pills+'</div><p>'+esc(p.text)+'</p>'+(p.cost?'<p class="cost">Approx. cost: '+esc(p.cost)+'</p>':'');}
+var GROUPS=[['Existing fridge',['K','J']],['Inside the fridge',['1','2','3','4','5','6','7','8','9','10','A','B','D']],['Link',['C']],['Outside the fridge',['E','F','G','H','I']]];
+var list=document.getElementById('list');
+GROUPS.forEach(function(g){var d=document.createElement('div');d.className='grpt';d.innerHTML='<h3>'+g[0]+'</h3>';
+  g[1].forEach(function(id){var p=parts[id],b=document.createElement('button');b.className='item';b.type='button';b.dataset.id=id;
+    b.innerHTML='<span class="num">'+(p.tag?esc(id):'•')+'</span><span>'+esc(p.name)+'</span><span class="pd '+(p.path==='n'?'':p.path)+'"></span>';
+    b.addEventListener('click',function(){select(id,true);});d.appendChild(b);});list.appendChild(d);});
+showIntro();
+
+/* ---------- selection, camera ---------- */
+var tw=null;
+function startTween(tT,tP,dur){tw={t0:performance.now(),dur:reduce?1:(dur||900),fT:controls.target.clone(),fP:camera.position.clone(),tT:tT.clone(),tP:tP.clone()};}
+controls.addEventListener('start',function(){tw=null;});
+function focusOn(p){var box=new T.Box3().setFromObject(p.group),c=box.getCenter(new T.Vector3()),s=box.getSize(new T.Vector3()).length();
+  var dist=Math.max(s*2,62),dir=camera.position.clone().sub(controls.target).normalize();startTween(c,c.clone().addScaledVector(dir,dist));}
+function select(id,focus){
+  if(id&&parts[id]&&parts[id].noPick)id=null;
+  selected=id;if(id){showPart(parts[id]);if(focus&&id!=='K')focusOn(parts[id]);}else showIntro();applyVisual();}
+document.addEventListener('keydown',function(ev){if(ev.key==='Escape')select(null);});
+
+var VIEWS={overview:{t:[18,-4,6],p:[128,80,176]},head:{t:[-6,2,-4],p:[42,38,74]},gasket:{t:[43,-7,32],p:[80,16,68]},unit:{t:[62,-6,28],p:[94,22,84]}};
+function setView(k){var v=VIEWS[k];startTween(V(v.t[0],v.t[1],v.t[2]),V(v.p[0],v.p[1],v.p[2]),1000);
+  document.querySelectorAll('[data-view]').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.view===k));});}
+camera.position.set(VIEWS.overview.p[0],VIEWS.overview.p[1],VIEWS.overview.p[2]);controls.target.set(VIEWS.overview.t[0],VIEWS.overview.t[1],VIEWS.overview.t[2]);
+
+function applyToggles(){
+  parts['8'].meshes.forEach(function(m){if(m.userData.cut)m.visible=!st.hood;});
+  parts.I.meshes.forEach(function(m){if(m.userData.cut)m.visible=!st.box;});
+  parts.K.group.visible=st.fridge;tagBox.style.display=st.labels?'':'none';eTarget=st.explode?1:0;}
+document.querySelectorAll('[data-view]').forEach(function(b){b.addEventListener('click',function(){setView(b.dataset.view);});});
+document.querySelectorAll('[data-tog]').forEach(function(b){b.addEventListener('click',function(){var k=b.dataset.tog;st[k]=!st[k];b.setAttribute('aria-pressed',String(st[k]));applyToggles();});});
+document.querySelectorAll('[data-path]').forEach(function(b){b.addEventListener('click',function(){pathMode=b.dataset.path;
+  document.querySelectorAll('[data-path]').forEach(function(x){x.setAttribute('aria-pressed',String(x===b));});applyVisual();});});
+document.getElementById('screenBtn').addEventListener('click',function(){screenIdx=(screenIdx+1)%3;drawScreen();});
+applyToggles();ready=true;applyVisual();
+
+/* ---------- picking ---------- */
+var ray=new T.Raycaster(),ndc=new T.Vector2();
+function visibleChain(o){while(o){if(!o.visible)return false;o=o.parent;}return true;}
+function pick(ev){var r=renderer.domElement.getBoundingClientRect();ndc.set(((ev.clientX-r.left)/r.width)*2-1,-((ev.clientY-r.top)/r.height)*2+1);ray.setFromCamera(ndc,camera);
+  var list=[];Object.keys(parts).forEach(function(k){var p=parts[k];if(p.noPick)return;p.meshes.forEach(function(m){if(visibleChain(m)&&!(pathMode!=='all'&&!inSet(p)))list.push(m);});});
+  var hits=ray.intersectObjects(list,false),veil=null;
+  for(var i=0;i<hits.length;i++){var m=hits[i].object;if(m.userData.veil){if(!veil)veil=m;continue;}return m.userData.part;}
+  return veil?veil.userData.part:null;}
+var down=null,tip=document.getElementById('tip');
+renderer.domElement.addEventListener('pointerdown',function(ev){down={x:ev.clientX,y:ev.clientY};});
+renderer.domElement.addEventListener('pointerup',function(ev){if(!down)return;var moved=Math.hypot(ev.clientX-down.x,ev.clientY-down.y);down=null;if(moved<5)select(pick(ev),true);});
+renderer.domElement.addEventListener('pointermove',function(ev){if(ev.buttons||ev.pointerType==='touch')return;var id=pick(ev);
+  if(id!==hovered){hovered=id;applyVisual();}
+  var r=stage.getBoundingClientRect();if(id){tip.textContent=parts[id].name;tip.style.left=(ev.clientX-r.left)+'px';tip.style.top=(ev.clientY-r.top)+'px';tip.classList.add('show');}else tip.classList.remove('show');});
+renderer.domElement.addEventListener('pointerleave',function(){if(hovered){hovered=null;applyVisual();}tip.classList.remove('show');});
+
+/* ---------- loop ---------- */
+function resize(){var w=stage.clientWidth,h=stage.clientHeight;if(!w||!h)return;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
+if(window.ResizeObserver)new ResizeObserver(resize).observe(stage);else window.addEventListener('resize',resize);resize();
+
+var clock=new T.Clock();
+function frame(){requestAnimationFrame(frame);
+  var dt=Math.min(.05,clock.getDelta()),time=clock.elapsedTime;
+  e+=(eTarget-e)*(reduce?1:1-Math.exp(-dt*6.5));if(Math.abs(eTarget-e)<.001)e=eTarget;
+  Object.keys(parts).forEach(function(k){var p=parts[k];p.group.position.copy(p.base).addScaledVector(p.off,e);
+    if(st.shake&&!reduce){if(k==='A'||k==='D')p.group.position.z+=Math.sin(time*70)*.1;if(k==='9')p.group.position.x+=Math.sin(time*70)*.05;}});
+  rays.visible=st.rays&&e<.15;
+  if(rays.visible)pulses.forEach(function(s){var u=reduce?.5:((time*.45+s.userData.ph)%1);s.position.set(s.userData.x0+u*s.userData.L,s.userData.y,s.userData.z);});
+  if(tw){var k=Math.min(1,(performance.now()-tw.t0)/tw.dur),q=k<.5?4*k*k*k:1-Math.pow(-2*k+2,3)/2;
+    controls.target.lerpVectors(tw.fT,tw.tT,q);camera.position.lerpVectors(tw.fP,tw.tP,q);if(k>=1)tw=null;}
+  controls.update();renderer.render(scene,camera);updateTags();}
+frame();
+})();
+</script>
+
+</body></html>
