@@ -109,6 +109,8 @@ Thresholds are at the top of `mybank_vision.py` and should be tuned for your lig
 
 # MyBank Unit
 
+[Open Interactive 3D Model](https://username.github.io/repository/model.html)
+
 A 3D model of the add-on from the design sheet. The camera, backlight and probes sit inside the existing fridge. The processor, battery, screen and alarm stay outside, joined by a flat cable that passes under the door gasket.
 
 View
