@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>مراقب صندوق بنك الدم</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#eef3f6;--card:#fff;--ink:#14232e;--mut:#5d7080;--line:#d7e2e9;--blood:#a4122b;--cold:#1f7a8c;--ok:#1d8a5b;--warn:#c98a1b;--crit:#c8102e;color-scheme:light}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"IBM Plex Sans Arabic",Tahoma,"Segoe UI",sans-serif;line-height:1.5}
+.num{direction:ltr;unicode-bidi:isolate;display:inline-block;font-variant-numeric:tabular-nums}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:18px 28px;background:var(--ink);color:#fff}
+header h1{margin:0;font-size:22px}
+header small{display:block;color:#9fb4c3;font-size:13px;font-weight:400}
+.tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+button{font:inherit;border:0;border-radius:8px;padding:8px 16px;cursor:pointer;background:#fff;color:var(--ink);font-weight:600}
+button.pri{background:var(--blood);color:#fff}
+button:focus-visible{outline:3px solid #7fd0e0;outline-offset:2px}
+.chip{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:99px;background:#ffffff1f;font-size:14px}
+.dot{width:10px;height:10px;border-radius:50%;background:#8aa}
+.chip.live .dot{background:#3ddc97}.chip.demo .dot{background:#f2b84b}
+#banner{margin:20px 28px 0;padding:16px 22px;border-radius:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;background:#e3f4ec;color:#0e5b3b;border:2px solid #b8e2cf}
+#banner b{font-size:22px}
+#banner.warn{background:#fff3da;color:#7a5200;border-color:#f0d08c}
+#banner.crit{background:var(--crit);color:#fff;border-color:var(--crit);animation:pulse 1s infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 8px #c8102e33}}
+main{display:grid;grid-template-columns:repeat(12,1fr);gap:18px;padding:20px 28px 28px}
+.card{background:var(--card);border-radius:14px;padding:20px;border:1px solid var(--line)}
+.card h2{margin:0 0 12px;font-size:16px;color:var(--mut);font-weight:600}
+.bagc{grid-column:span 4;display:flex;gap:18px;align-items:center;justify-content:center}
+.chart{grid-column:span 8}
+.radar{grid-column:span 5}.door{grid-column:span 3}.log{grid-column:span 4}
+#bag{width:170px;flex:none}
+.scale{position:relative;width:16px;height:230px;background:#e6edf1;border-radius:8px;flex:none}
+#band{position:absolute;inset-inline:0;background:#bfe5d3;border-radius:8px}
+#mark{position:absolute;inset-inline:-6px;height:6px;border-radius:3px;background:var(--ink);transition:bottom .4s}
+.sl{position:absolute;inset-inline-start:24px;font-size:12px;color:var(--mut);white-space:nowrap}
+.bigt{font-size:54px;font-weight:700;line-height:1}
+.bigt small{font-size:22px;color:var(--mut);font-weight:400}
+.stats{display:flex;gap:16px;color:var(--mut);font-size:14px;margin-top:8px}
+canvas{width:100%;height:240px;display:block}
+.doorv{display:flex;flex-direction:column;align-items:center;gap:8px;padding-top:6px}
+.doorv svg{width:110px}
+#doorTxt{font-size:24px;font-weight:700}
+ul{list-style:none;margin:0;padding:0;max-height:230px;overflow:auto;font-size:14px}
+li{padding:7px 0;border-bottom:1px solid var(--line);display:flex;gap:10px}
+li time{color:var(--mut);flex:none}
+li.crit{color:var(--crit);font-weight:600}li.warn{color:#8a5d00}li.ok{color:var(--ok)}
+.demo-bar{grid-column:1/-1;display:none;gap:10px;flex-wrap:wrap;align-items:center;background:#fff8e6;border:1px dashed #e0b95a;border-radius:12px;padding:12px 16px}
+.demo-bar.on{display:flex}
+.cfg{grid-column:1/-1;font-size:14px;color:var(--mut);display:flex;gap:18px;flex-wrap:wrap;align-items:center}
+.cfg input{width:64px;font:inherit;padding:4px 6px;border:1px solid var(--line);border-radius:6px;direction:ltr}
+@media(max-width:980px){.bagc,.chart,.radar,.door,.log{grid-column:1/-1}}
+@media(prefers-reduced-motion:reduce){#banner.crit{animation:none}}
+</style>
+</head>
+<body>
+<header>
+  <h1>مراقب صندوق بنك الدم<small>سلسلة التبريد · الباب · اقتراب الأشخاص — ESP32-S3</small></h1>
+  <div class="tools">
+    <span class="chip" id="conn"><span class="dot"></span><span id="connTxt">غير متصل</span></span>
+    <button class="pri" id="btnConn">اتصال عبر USB</button>
+    <button id="btnDemo">وضع العرض التجريبي</button>
+  </div>
+</header>
+
+<div id="banner"><div><b id="bTitle">في انتظار البيانات</b><div id="bSub">اربط الجهاز عبر USB أو شغّل وضع العرض</div></div><span class="num" id="bTime"></span></div>
+
+<main>
+  <div class="demo-bar" id="demoBar">
+    <b>سيناريوهات العرض:</b>
+    <button id="sDoor">فتح الباب</button>
+    <button id="sProx">اقتراب شخص</button>
+    <button id="sTemp">ارتفاع الحرارة</button>
+  </div>
+
+  <section class="card bagc" aria-label="درجة الحرارة">
+    <div>
+      <h2>درجة حرارة الصندوق</h2>
+      <svg id="bag" viewBox="0 0 200 260" aria-hidden="true">
+        <defs><clipPath id="clip"><path id="bagBody" d="M40 62Q40 42 60 42H140Q160 42 160 62V212Q160 238 134 238H66Q40 238 40 212Z"/></clipPath></defs>
+        <rect x="92" y="6" width="16" height="38" rx="6" fill="#d7e2e9"/>
+        <path d="M40 62Q40 42 60 42H140Q160 42 160 62V212Q160 238 134 238H66Q40 238 40 212Z" fill="#fff"/>
+        <g clip-path="url(#clip)"><rect x="30" y="84" width="140" height="170" fill="#a4122b"/><rect x="30" y="84" width="140" height="6" fill="#c8102e"/></g>
+        <use href="#bagBody" id="bagLine" fill="none" stroke="#14232e" stroke-width="5"/>
+        <text id="bagT" x="100" y="170" text-anchor="middle" fill="#fff" font-size="40" font-weight="700" direction="ltr">--.-</text>
+        <text x="100" y="196" text-anchor="middle" fill="#ffd9de" font-size="16">°C</text>
+      </svg>
+      <div class="stats"><span>أدنى: <b class="num" id="tMin">--</b></span><span>أعلى: <b class="num" id="tMax">--</b></span></div>
+    </div>
+    <div class="scale" id="scale"><div id="band"></div><div id="mark" style="bottom:0"></div><span class="sl" id="slHi"></span><span class="sl" id="slLo"></span></div>
+  </section>
+
+  <section class="card chart"><h2>الحرارة خلال آخر دقيقتين <span style="font-weight:400">(المنطقة الخضراء = المدى الآمن)</span></h2><canvas id="cv"></canvas></section>
+
+  <section class="card radar"><h2>الاقتراب من الصندوق</h2>
+    <svg viewBox="0 0 300 175" width="100%" aria-label="رادار المسافة">
+      <path d="M10 165A140 140 0 0 1 290 165Z" fill="#f4f8fa"/>
+      <path id="zWarn" fill="#fff0cf"/><path id="zAlrm" fill="#ffd3d9"/>
+      <path d="M10 165A140 140 0 0 1 290 165" fill="none" stroke="#c4d3dc" stroke-width="2"/>
+      <line x1="150" y1="165" x2="150" y2="25" stroke="#c4d3dc" stroke-dasharray="3 5"/>
+      <rect x="132" y="162" width="36" height="12" rx="3" fill="#a4122b"/>
+      <circle id="rdot" cx="150" cy="100" r="9" fill="#14232e" style="transition:cy .3s" display="none"/>
+    </svg>
+    <div style="text-align:center"><span class="bigt" style="font-size:38px"><span class="num" id="dist">---</span> <small>سم</small></span><div id="distTxt" style="color:var(--mut)">لا أحد قريب</div></div>
+  </section>
+
+  <section class="card door"><h2>باب الصندوق</h2>
+    <div class="doorv">
+      <svg viewBox="0 0 110 120"><rect x="14" y="10" width="82" height="100" rx="8" fill="#e6edf1" stroke="#14232e" stroke-width="4"/><g id="doorLeaf"><rect x="14" y="10" width="82" height="100" rx="8" fill="#1f7a8c" stroke="#14232e" stroke-width="4"/><circle cx="82" cy="62" r="5" fill="#fff"/></g></svg>
+      <div id="doorTxt">--</div><div style="color:var(--mut);font-size:14px" id="doorSub"></div>
+    </div></section>
+
+  <section class="card log"><h2>سجل الأحداث</h2><ul id="log"></ul></section>
+
+  <div class="cfg">
+    <span>حدود التنبيه (°م):</span>
+    <label>الأدنى <input id="cLow" type="number" step="0.5" value="2"></label>
+    <label>الأعلى <input id="cHigh" type="number" step="0.5" value="8"></label>
+    <label>تحذير الاقتراب (سم) <input id="cWarn" type="number" value="120"></label>
+    <label>إنذار الاقتراب (سم) <input id="cAlrm" type="number" value="60"></label>
+    <span>اجعلها مطابقة لقيم الكود في الجهاز.</span>
+  </div>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+const S={t:null,d:null,door:null,hist:[],min:null,max:null,mode:'off',last:0,prev:''};
+const cfg=()=>({lo:+$('cLow').value,hi:+$('cHigh').value,w:+$('cWarn').value,a:+$('cAlrm').value});
+const fmt=t=>new Date(t).toLocaleTimeString('en-GB');
+
+function ingest(t,d,door){
+  S.t=t;S.d=d;S.door=door;S.last=Date.now();
+  if(t!=null){S.hist.push({x:Date.now(),y:t});if(S.hist.length>120)S.hist.shift();
+    S.min=S.min==null?t:Math.min(S.min,t);S.max=S.max==null?t:Math.max(S.max,t);}
+  render();
+}
+function parse(line){
+  const m=line.match(/Distance:\s*(\S+)\s*cm\s*\|\s*Temp:\s*(\S+)\s*C\s*\|\s*Door:\s*(OPEN|CLOSED)/i);
+  if(!m)return;
+  const d=parseFloat(m[1]),t=parseFloat(m[2]);
+  ingest(isNaN(t)?null:t,isNaN(d)?null:d,m[3].toUpperCase());
+}
+function status(){
+  const c=cfg();
+  if(S.door==='OPEN')return{k:'door',l:'crit',t:'تم فتح صندوق الدم!',s:'إنذار الباب — أعلى أولوية'};
+  if(S.t!=null&&(S.t<c.lo||S.t>c.hi))return{k:'temp',l:'crit',t:S.t<c.lo?'الحرارة أقل من المدى الآمن':'الحرارة أعلى من المدى الآمن',s:`المدى الآمن ${c.lo} – ${c.hi} °م`};
+  if(S.d!=null&&S.d<=c.a)return{k:'prox2',l:'crit',t:'شخص قريب جداً من الصندوق',s:'ابتعد عن الصندوق'};
+  if(S.d!=null&&S.d<=c.w)return{k:'prox1',l:'warn',t:'شخص يقترب من الصندوق',s:'تحذير الاقتراب'};
+  return{k:'ok',l:'ok',t:'النظام آمن',s:'الحرارة ضمن المدى والباب مغلق'};
+}
+function addLog(l,txt){const li=document.createElement('li');li.className=l;li.innerHTML=`<time class="num">${fmt(Date.now())}</time><span>${txt}</span>`;$('log').prepend(li);while($('log').children.length>40)$('log').lastChild.remove();}
+
+function render(){
+  const c=cfg(),st=status();
+  const b=$('banner');b.className=st.l==='ok'?'':st.l;$('bTitle').textContent=st.t;$('bSub').textContent=st.s;$('bTime').textContent=fmt(S.last);
+  if(st.k!==S.prev){addLog(st.l,st.t);S.prev=st.k;}
+  $('bagT').textContent=S.t==null?'--.-':S.t.toFixed(1);
+  $('bagLine').setAttribute('stroke',st.k==='temp'?'#c8102e':st.l==='ok'?'#14232e':st.l==='warn'?'#c98a1b':'#14232e');
+  $('tMin').textContent=S.min==null?'--':S.min.toFixed(1);$('tMax').textContent=S.max==null?'--':S.max.toFixed(1);
+  // scale
+  const lo=c.lo-6,hi=c.hi+6,p=v=>Math.max(0,Math.min(100,(v-lo)/(hi-lo)*100));
+  $('band').style.bottom=p(c.lo)+'%';$('band').style.top=(100-p(c.hi))+'%';
+  $('mark').style.bottom=`calc(${S.t==null?0:p(S.t)}% - 3px)`;
+  $('slHi').style.top=(100-p(c.hi))+'%';$('slHi').textContent=c.hi+'°';$('slLo').style.bottom=p(c.lo)+'%';$('slLo').textContent=c.lo+'°';
+  // door
+  const open=S.door==='OPEN';
+  $('doorTxt').textContent=S.door==null?'--':open?'مفتوح':'مغلق';$('doorTxt').style.color=open?'var(--crit)':'var(--ok)';
+  $('doorSub').textContent=open?'المغناطيس بعيد عن الحساس':'المغناطيس ملاصق للحساس';
+  $('doorLeaf').setAttribute('transform',open?'translate(14 0) scale(.42 1) translate(-14 0)':'');
+  // radar
+  const R=140,zone=r=>`M${150-r} 165A${r} ${r} 0 0 1 ${150+r} 165Z`,max=200;
+  $('zWarn').setAttribute('d',zone(R*c.w/max));$('zAlrm').setAttribute('d',zone(R*c.a/max));
+  const dot=$('rdot');
+  if(S.d==null){dot.setAttribute('display','none');$('dist').textContent='---';$('distTxt').textContent='لا أحد قريب';}
+  else{dot.removeAttribute('display');dot.setAttribute('cy',165-Math.min(S.d,max)/max*R);
+    dot.setAttribute('fill',S.d<=c.a?'#c8102e':S.d<=c.w?'#c98a1b':'#14232e');
+    $('dist').textContent=Math.round(S.d);$('distTxt').textContent=S.d<=c.a?'منطقة الإنذار':S.d<=c.w?'منطقة التحذير':'خارج المنطقة الحرجة';}
+  drawChart();
+}
+function drawChart(){
+  const cv=$('cv'),dpr=devicePixelRatio||1,w=cv.clientWidth,h=cv.clientHeight;
+  cv.width=w*dpr;cv.height=h*dpr;const g=cv.getContext('2d');g.scale(dpr,dpr);
+  const c=cfg(),ys=S.hist.map(p=>p.y);
+  const lo=Math.min(c.lo-3,...ys),hi=Math.max(c.hi+3,...ys),py=v=>h-14-(v-lo)/(hi-lo)*(h-28);
+  g.fillStyle='#bfe5d3aa';g.fillRect(0,py(c.hi),w,py(c.lo)-py(c.hi));
+  g.fillStyle='#5d7080';g.font='12px sans-serif';g.textAlign='left';
+  g.fillText(c.hi+'°',4,py(c.hi)-4);g.fillText(c.lo+'°',4,py(c.lo)+14);
+  if(S.hist.length<2)return;
+  g.beginPath();S.hist.forEach((p,i)=>{const x=i/119*(w-10)+5;i?g.lineTo(x,py(p.y)):g.moveTo(x,py(p.y));});
+  g.strokeStyle='#1f7a8c';g.lineWidth=2.5;g.lineJoin='round';g.stroke();
+}
+
+/* ---------- USB (Web Serial) ---------- */
+function setConn(m,txt){S.mode=m;$('conn').className='chip '+m;$('connTxt').textContent=txt;$('demoBar').classList.toggle('on',m==='demo');}
+async function connect(){
+  if(!('serial' in navigator)){alert('المتصفح لا يدعم Web Serial. استخدم Chrome أو Edge على الكمبيوتر.');return;}
+  try{
+    const port=await navigator.serial.requestPort();await port.open({baudRate:115200});
+    stopDemo();setConn('live','متصل بالجهاز');addLog('ok','تم الاتصال بالجهاز');
+    const dec=new TextDecoderStream();port.readable.pipeTo(dec.writable);
+    const rd=dec.readable.getReader();let buf='';
+    for(;;){const{value,done}=await rd.read();if(done)break;buf+=value;let i;
+      while((i=buf.indexOf('\n'))>=0){parse(buf.slice(0,i));buf=buf.slice(i+1);}}
+    setConn('off','انقطع الاتصال');
+  }catch(e){setConn('off','غير متصل');addLog('warn','تعذر الاتصال: أغلق Serial Monitor في Arduino IDE ثم أعد المحاولة');}
+}
+/* ---------- Demo ---------- */
+let demoTimer=null,tick=0,force={door:false,prox:false,temp:false};
+function startDemo(){stopDemo();S.hist=[];S.min=S.max=null;setConn('demo','وضع العرض التجريبي');
+  demoTimer=setInterval(()=>{tick++;
+    const base=force.temp?9.6:4.2+Math.sin(tick/15)*0.5+(Math.random()-.5)*.15;
+    const d=force.prox?45+Math.random()*8:(tick%60>45?100+Math.random()*10:null);
+    ingest(base,d,force.door?'OPEN':'CLOSED');},1000);}
+function stopDemo(){clearInterval(demoTimer);demoTimer=null;}
+const tog=(id,k)=>$(id).onclick=()=>{force[k]=!force[k];$(id).style.background=force[k]?'#f2b84b':'';};
+tog('sDoor','door');tog('sProx','prox');tog('sTemp','temp');
+$('btnConn').onclick=connect;$('btnDemo').onclick=startDemo;
+['cLow','cHigh','cWarn','cAlrm'].forEach(i=>$(i).oninput=render);
+setInterval(()=>{if(S.mode==='live'&&Date.now()-S.last>4000){$('connTxt').textContent='متصل — لا توجد بيانات';}},1000);
+addEventListener('resize',drawChart);render();
+</script>
+</body>
+</html>
