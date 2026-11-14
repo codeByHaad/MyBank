@@ -17,7 +17,7 @@
 | Stage | What you will see | Open |
 |---|---|---|
 | **Stage 1: Prototype** | The interactive design sheet of what we built for this hackathon: system architecture, cold-head cross-section, alarm escalation, parts list and cost | **[▶ Open the interactive prototype](https://codebyhaad.github.io/MyBank/)** |
-| **Stage 2: Market-ready product** | The 3D model of the product we intend to deliver. Every part is numbered and clickable, with a colour key and a full reference table | **[▶ Open the 3D product model](https://codebyhaad.github.io/MyBank/mybank_market_ready_3d.html)** |
+| **Stage 2: Market-ready product** | The 3D model of the product we intend to deliver. Every part is numbered and clickable, with a colour key and a full reference table | **[▶ Open the 3D product model](https://codebyhaad.github.io/MyBank/)** |
 
 *Tip for the 3D model: drag to rotate, scroll to zoom, click any part to read what it is. Use the drawer slider to slide the drawer open and closed.*
 
